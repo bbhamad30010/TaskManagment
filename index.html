@@ -1,0 +1,310 @@
+
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Task List Display</title>
+    <link rel="stylesheet" href=https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap.min.css>
+    <script src=https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.17.5/xlsx.full.min.js></script>
+
+    <style>
+        body {
+            background-color: #f8f9fa;
+            padding-top: 20px;
+        }
+
+        
+        .container {
+            background-color: #ffffff;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        .Divider {
+            margin-top: 20px;
+        
+            margin-bottom: 20px;
+            
+            border-top: 2px solid #ddd;
+           
+        }
+
+        table {
+            margin-top: 20px;
+        }
+
+        form {
+            margin-bottom: 20px;
+        }
+
+        button {
+            margin-top: 32px;
+        }
+    </style>
+
+    <script type="text/javascript">
+
+
+        function exportToExcel(tableID, filename = '') {
+            var tableSelect = document.getElementById(tableID);
+
+            // Create sheet 
+            var ws = XLSX.utils.table_to_sheet(tableSelect);
+
+            // create a workbook with the sheet i have created erlier
+            var wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, 'Sheet 1');
+
+            // convert this workbook to a data URL so we can access it later
+            var wbData = XLSX.write(wb, { bookType: 'xlsx', type: 'base64' });
+
+            //create a data URL for the workbook
+            var dataURL = 'data:application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;base64,' + wbData;
+
+            
+            var link = document.createElement('a');
+            link.href = dataURL;
+            //choose file name while exporting
+            link.download = filename || 'export_excel_data.xlsx';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+
+
+        //Adding Tasks in the form/table so later we can export it as excel file.
+        function addRow() {
+            var taskName = document.getElementById('taskName').value;
+            var description = document.getElementById('description').value;
+            var dueDate = document.getElementById('dueDate').value;
+            var status = document.getElementById('status').value;
+            var completion = document.getElementById('completion').value;
+
+            // Validation to limit adding tasks if feilds are null
+            if (!taskName || !description || !dueDate || !status || !completion) {
+                alert('Please fill in all fields.');
+                return;
+            }
+
+            var table = document.getElementById('tblexportData').getElementsByTagName('tbody')[0];
+            var newRow = table.insertRow(table.rows.length);
+
+            var cell1 = newRow.insertCell(0);
+            var cell2 = newRow.insertCell(1);
+            var cell3 = newRow.insertCell(2);
+            var cell4 = newRow.insertCell(3);
+            var cell5 = newRow.insertCell(4);
+
+            cell1.innerHTML = taskName;
+            cell2.innerHTML = description;
+            cell3.innerHTML = dueDate;
+            cell4.innerHTML = status;
+            cell5.innerHTML = completion;
+
+            //clear the form after adding a new task
+            document.getElementById('taskName').value = '';
+            document.getElementById('description').value = '';
+            document.getElementById('dueDate').value = '';
+            document.getElementById('status').value = '';
+            document.getElementById('completion').value = '';
+
+            // Alert for successfully added task into the table
+            alert('Task added successfully!');
+        }
+
+
+        //Uploading the Excel File
+        function handleFileUpload() {
+            var input = document.getElementById('fileInput');
+            var file = input.files[0];
+            var reader = new FileReader();
+
+            reader.onload = function (e) {
+                var data = new Uint8Array(e.target.result);
+                var workbook = XLSX.read(data, { type: 'array' });
+
+                var sheet = workbook.Sheets[workbook.SheetNames[0]];
+                var sheetData = XLSX.utils.sheet_to_json(sheet);
+
+                var table = document.getElementById('tblexportData').getElementsByTagName('tbody')[0];
+                table.innerHTML = '';
+
+                //populate the table with the data from the Excel file
+                sheetData.forEach(function (row) {
+                    var newRow = table.insertRow(table.rows.length);
+
+                    var cell1 = newRow.insertCell(0);
+                    var cell2 = newRow.insertCell(1);
+                    var cell3 = newRow.insertCell(2);
+                    var cell4 = newRow.insertCell(3);
+                    var cell5 = newRow.insertCell(4);
+
+                    cell1.innerHTML = row['Task Name'] || '';
+                    cell2.innerHTML = row.Description || '';
+
+                    //check if the 'Due Date' not null or exist in columns
+                    if (row['Due Date']) {
+                        // this to convert Excel date to a JavaScript Date object (This caused some issues while getting date)
+                        var excelDueDate = parseFloat(row['Due Date']);
+                        var dateObject = XLSX.SSF.parse_date_code(excelDueDate);
+
+                        // Format the date to string
+                        var formattedDate = new Date(dateObject.y, dateObject.m - 1, dateObject.d).toLocaleDateString();
+
+                        cell3.innerHTML = formattedDate;
+                    } else {
+                        cell3.innerHTML = '';
+                    }
+
+
+
+                    cell4.innerHTML = row.Status || '';
+
+                    // Will check if Percentage is null it will show undifined just for better user experince
+                    if (row['Percentage Completion'] !== undefined) {
+                        cell5.innerHTML = row['Percentage Completion'];
+                    } else {
+                        cell5.innerHTML = '';
+                    }
+                });
+            };
+
+            reader.readAsArrayBuffer(file);
+        }
+
+        //This function will have filter for both Date and Status and calling it in the HTML OnClick later
+        function filterData() {
+            // debugger;
+            var filterStatus = document.getElementById('filterStatus').value.toLowerCase();
+            var filterDueDate = document.getElementById('filterDueDate').value;
+            var table = document.getElementById('tblexportData').getElementsByTagName('tbody')[0];
+            var rows = table.getElementsByTagName('tr');
+
+            for (var i = 0; i < rows.length; i++) {
+                var statusCell = rows[i].getElementsByTagName('td')[3];
+                var dueDateCell = rows[i].getElementsByTagName('td')[2];
+
+                var status = statusCell ? statusCell.textContent.trim().toLowerCase() : '';
+                var dueDate = dueDateCell ? new Date(dueDateCell.textContent.trim()) : null;
+
+                // Check if filterStatus is 'all' or status = filterStatus
+                var statusMatch = filterStatus === 'all' || status === filterStatus;
+
+                // Check if filterDueDate is empty or dueDate equals the filterDueDate
+                var dueDateMatch = filterDueDate === '' || (dueDate instanceof Date && !isNaN(dueDate) &&
+                    dueDate.setHours(0, 0, 0, 0) === new Date(filterDueDate).setHours(0, 0, 0, 0));
+
+                // display Data based on both status and due date filtering
+                if (filterStatus !== '' && filterDueDate !== '') {
+                    rows[i].style.display = (statusMatch && dueDateMatch) ? '' : 'none';
+                } else if (filterStatus !== '') {
+                    rows[i].style.display = statusMatch ? '' : 'none';
+                } else if (filterDueDate !== '') {
+                    rows[i].style.display = dueDateMatch ? '' : 'none';
+                } else {
+                    rows[i].style.display = '';
+                }
+            }
+        }
+
+    </script>
+</head>
+
+<body>
+    <div class="container">
+        <form class="mb-3">
+
+            <div class="form-row">
+                <div class="col-md-4 mb-3">
+                    <label for="taskName">Task Name:</label>
+                    <input type="text" class="form-control" id="taskName" name="taskName" required>
+                </div>
+                <div class="col-md-4 mb-3">
+                    <label for="description">Description:</label>
+                    <input type="text" class="form-control" id="description" name="description" required>
+                </div>
+                <div class="col-md-4 mb-3">
+                    <label for="dueDate">Due Date:</label>
+                    <input type="date" class="form-control" id="dueDate" name="dueDate" required>
+                </div>
+            </div>
+
+            <div class="form-row">
+                <div class="col-md-4 mb-3">
+                    <label for="status">Status:</label>
+                    <select class="form-control" id="status" name="status" required>
+                        <option value="Not Started">Not Started</option>
+                        <option value="In Progress">In Progress</option>
+                        <option value="Completed">Completed</option>
+                    </select>
+                </div>
+                <div class="col-md-4 mb-3">
+                    <label for="completion">Completion (%):</label>
+                    <input type="number" class="form-control" id="completion" name="completion" required>
+                </div>
+                <div class="col-md-4 mb-3">
+                    <button type="button" class="btn btn-primary btn-block" onclick="addRow()">Add</button>
+                </div>
+            </div>
+        </form>
+
+        <div class="form-row Divider">
+            <div class="col-md-2 mb-3">
+                <br>
+                <label for="filterStatus">Filter by Status:</label>
+                <select class="form-control" id="filterStatus" name="filterStatus">
+                    <option value="">All</option>
+                    <option value="Not Started">Not Started</option>
+                    <option value="In Progress">In Progress</option>
+                    <option value="Completed">Completed</option>
+                </select>
+            </div>
+            <div class="col-md-4 mb-3">
+                <br>
+                <label for="filterDueDate">Filter by Due Date:</label>
+                <input type="date" class="form-control" id="filterDueDate" name="filterDueDate">
+            </div>
+            <div class="col-md-2 mb-3">
+                <br>
+
+                <button type="button" class="btn btn-info btn-block" onclick="filterData()">Filter</button>
+            </div>
+        </div>
+
+        <div class="form-row">
+            <div class="col-md-12 mb-3">
+                <button onclick="exportToExcel('tblexportData', 'task-data')" class="btn btn-success btn-block">Export
+                    Table Data To Excel File</button>
+            </div>
+        </div>
+
+        <div class="form-row">
+            <div class="col-md-12 mb-3">
+                <label class="btn btn-info btn-block">
+                    Upload Excel File<input type="file" class="form-control-file" id="fileInput" accept=".xls, .xlsx"
+                        onchange="handleFileUpload()" style="display: none;">
+                </label>
+            </div>
+        </div>
+
+        <table id="tblexportData" class="table table-striped table-bordered">
+            <thead class="thead-dark">
+                <tr>
+                    <th>Task Name</th>
+                    <th>Description</th>
+                    <th>Due Date</th>
+                    <th>Status</th>
+                    <th>Percentage Completion</th>
+                </tr>
+            </thead>
+            <tbody>
+
+            </tbody>
+        </table>
+    </div>
+</body>
+
+</html>
